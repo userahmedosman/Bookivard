@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="Bookivard.Domain/Bookivard.Domain.csproj" Id="463270fd-1483-4cf6-b575-11f3678775ea" />
+  </Folder>
+  <Folder Name="/test/" />
+</Solution>
