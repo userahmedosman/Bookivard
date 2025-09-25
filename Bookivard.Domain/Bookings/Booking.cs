@@ -1,5 +1,7 @@
 ﻿using Bookivard.Domain.Abstractions;
 using Bookivard.Domain.Apartments;
+using Bookivard.Domain.Bookings.Event;
+using Bookivard.Domain.Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,9 +12,9 @@ namespace Bookivard.Domain.Bookings
 {
     public sealed class Booking:Entity
     {
-        public Booking(
+        private Booking(
             Guid id,
-            Guid apartmentId, 
+            Apartment apartment, 
             Guid userId,
             DateRange dateRange,
             Money priceForPeriod,
@@ -23,7 +25,7 @@ namespace Bookivard.Domain.Bookings
             DateTime createdOnUtc
             ) :base(id)
         {
-            ApartmentId = apartmentId;
+            ApartmentId = apartment.Id;
             UserId = userId;
             DateRange = dateRange;
             PriceForPeriod = priceForPeriod;
@@ -33,6 +35,7 @@ namespace Bookivard.Domain.Bookings
             Status = status;
             CreatedOnUtc = createdOnUtc;
         }
+
 
         public Guid ApartmentId { get; private set; }
 
@@ -57,5 +60,96 @@ namespace Bookivard.Domain.Bookings
         public DateTime? RejectedOnUtc { get; private set; }
 
         public DateTime? CompletedOnUtc { get; private set; }
+
+        public static Booking Reserve(
+            Apartment apartment, 
+            Guid userId, 
+            DateRange duration, 
+            DateTime utcNow, 
+            PricingService pricingService)
+        {
+            var pricingDetails = pricingService.CalculatePrice(apartment, duration);
+            var booking = new Booking(
+                Guid.NewGuid(),
+                apartment,
+                userId,
+                duration,
+                pricingDetails.priceForPeriod,
+                pricingDetails.cleningFee,
+                pricingDetails.amenitiesUpCharge,
+                pricingDetails.totalPrice,
+                BookingStatus.Reserved,
+                utcNow);
+        
+            booking.RaiseDomainEvent(new BookingReservedDomainEvent(booking.Id));
+            apartment.LastBookedAtUtc = utcNow;
+            return booking;
+
+        }
+
+        public Result Confirm(DateTime utcNow)
+        {
+            if(Status != BookingStatus.Reserved)
+            {
+                return Result.Failur(BookingErrors.NotReserved);
+            }
+
+            Status = BookingStatus.Confirmed;
+            ConfirmedOnUtc = utcNow;
+            RaiseDomainEvent(new BookingConfirmedDomainEvent(Id));
+
+            return Result.Success();
+        }
+
+        public Result Reject(DateTime utcNow)
+        {
+            if (Status != BookingStatus.Reserved)
+            {
+                return Result.Failur(BookingErrors.NotReserved);
+            }
+
+            Status = BookingStatus.Rejected;
+            RejectedOnUtc = utcNow;
+            RaiseDomainEvent(new BookingRejectedDomainEvent(Id));
+
+            return Result.Success();
+        }
+
+
+        public Result Complete(DateTime utcNow)
+        {
+            if (Status != BookingStatus.Reserved)
+            {
+                return Result.Failur(BookingErrors.NotReserved);
+            }
+
+            Status = BookingStatus.Completed;
+            CompletedOnUtc = utcNow;
+            RaiseDomainEvent(new BookingCompletedDomainEvent(Id));
+
+            return Result.Success();
+        }
+
+        public Result Cancel(DateTime utcNow)
+        {
+            if (Status != BookingStatus.Reserved)
+            {
+                return Result.Failur(BookingErrors.NotReserved);
+            }
+
+            var currentDate = DateOnly.FromDateTime(utcNow);
+
+            if(currentDate > DateRange.Start)
+            {
+                return Result.Failur(BookingErrors.AlreadyStarted);
+            }
+
+            Status = BookingStatus.Cancelled;
+            CancelledOnUtc = utcNow;
+            RaiseDomainEvent(new BookingCancelledDomainEvent(Id));
+
+            return Result.Success();
+        }
+
     }
 }

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Bookivard.Domain.Apartments
+namespace Bookivard.Domain.Shared
 {
     public record Money(decimal amount, Currency currency)
     {
@@ -18,5 +18,12 @@ namespace Bookivard.Domain.Apartments
         }
 
         public static Money Zero() => new(0, Currency.None);
+
+        public static Money Zero(Currency currency) => new(0, currency);
+
+        public bool IsZero()
+        {
+            return this == Zero(currency);
+        }
     }
 }

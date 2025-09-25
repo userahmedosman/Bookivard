@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Bookivard.Domain.Apartments;
+namespace Bookivard.Domain.Shared;
 
 public record Currency
 {
